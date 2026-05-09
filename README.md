@@ -26,15 +26,11 @@ An atmospheric orbital survival game built with Pygame. Navigate a plasma-ribbon
 ### Setup
 1. Clone the repository or download the source code.
 
-
 ## Technical Highlights
 - **Inverse-Square Gravity**: Real physics-based superposition from multiple planetary bodies.
 - **Cinematic Camera**: Smooth interpolation with speed-sensitive zoom and tactile feedback.
 - **Plasma Ribbon**: Path-history interpolation for fluid, high-performance tail movement.
 - **Additive Rendering**: Custom glow pipeline for vibrant, atmospheric visuals.
-
-## Project Philosophy
-Gravity Snake focuses on **flow-state movement** and **minimalist presentation**. The goal was to create a "meditative survival" experience where the challenge comes from mastering orbital mechanics rather than combat or chaotic effects.
 
 ## Future Improvements
 - **Multiple Systems**: Procedurally generated binary or ternary star systems.
