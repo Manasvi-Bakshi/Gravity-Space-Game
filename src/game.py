@@ -50,6 +50,27 @@ class Game:
         # Space Phenomena
         self.ambient_debris = AmbientDebris(100, self.width, self.height)
         self.dust_current = DustCurrent(max_particles=40)
+        
+        # Scoring and State
+        self.score = 0
+        self.resonance = 1.0
+        self.system_center = (self.planets[0].pos + self.planets[1].pos) / 2.0
+
+    def reset_game(self):
+        """Resets the game state after failure."""
+        start_pos = (self.width / 2, self.height / 2 - 250)
+        self.snake = Snake(start_pos)
+        self.snake.velocity = pygame.math.Vector2(450, 0)
+        self.score = 0
+        self.resonance = 1.0
+        
+        # Robustly reset camera
+        self.camera.reset(start_pos)
+        
+        # Respawn collectibles
+        for c in self.collectibles:
+            c.planet = random.choice(self.planets)
+            c.respawn()
 
     def _init_stars(self):
         """Generates a static starfield for the background."""
@@ -81,13 +102,32 @@ class Game:
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     self.running = False
+                if event.key == pygame.K_SPACE and self.snake.is_dead:
+                    self.reset_game()
 
     def update(self):
+        if self.snake.is_dead:
+            # When dead, resonance collapses quickly
+            self.resonance = max(0.0, self.resonance - self.dt * 1.5)
+            self.snake.update(self.dt, None)
+            self.camera.update(self.snake, self.dt)
+            return
+
         keys = pygame.key.get_pressed()
         
         # Physics and Entities
         self.snake.update(self.dt, keys)
         apply_gravity(self.planets, self.snake, self.dt)
+        
+        # Soft Containment: Resonance decays far from the system center
+        dist_to_center = self.snake.pos.distance_to(self.system_center)
+        if dist_to_center > 1800:
+            # Deep space decay
+            decay_rate = (dist_to_center - 1800) / 1000.0
+            self.resonance = max(0.0, self.resonance - decay_rate * self.dt)
+        else:
+            # Gentle recovery near planets
+            self.resonance = min(1.0, self.resonance + self.dt * 0.2)
         
         for c in self.collectibles:
             c.update(self.dt)
@@ -107,6 +147,11 @@ class Game:
         self.dust_current.update(self.dt, self.planets)
 
     def _handle_collection(self, collectible):
+        # Progressions
+        self.score += 100
+        self.snake.body_length += 1
+        self.resonance = min(1.0, self.resonance + 0.1)
+
         # Visual feedback
         self.camera.apply_collection_feedback(self.snake.velocity)
         
@@ -125,13 +170,20 @@ class Game:
         collectible.respawn()
 
     def draw(self):
-        self.renderer.draw_background(self.screen, self.camera, self.stars)
+        # Clear glow surface at start of frame to fix persistent glow / deletion bugs
+        self.renderer.clear_glow_surface()
+        
+        self.renderer.draw_background(self.screen, self.camera, self.stars, self.resonance)
         
         # Phenomena rendered below planets and gameplay objects
-        self.renderer.draw_phenomena(self.screen, self.camera, self.ambient_debris, self.dust_current)
+        self.renderer.draw_phenomena(self.screen, self.camera, self.ambient_debris, self.dust_current, self.resonance)
         
-        self.renderer.draw_planets(self.screen, self.camera, self.planets)
-        self.renderer.draw_collectibles(self.screen, self.camera, self.collectibles, self.collection_particles)
-        self.renderer.draw_snake(self.screen, self.camera, self.snake)
-        self.renderer.draw_screen_pulse(self.screen, self.camera)
+        self.renderer.draw_planets(self.screen, self.camera, self.planets, self.resonance)
+        self.renderer.draw_collectibles(self.screen, self.camera, self.collectibles, self.collection_particles, self.resonance)
+        self.renderer.draw_snake(self.screen, self.camera, self.snake, self.resonance)
+        self.renderer.draw_screen_pulse(self.screen, self.camera, self.resonance)
+        
+        # Minimalist HUD
+        self.renderer.draw_hud(self.screen, self.snake, self.resonance, self.score)
+        
         pygame.display.flip()

@@ -18,6 +18,14 @@ class Camera:
         self.impulse = Vector2(0, 0)
         self.pulse_intensity = 0.0
         
+    def reset(self, start_pos):
+        """Clears all feedback and snaps to position."""
+        self.base_pos = Vector2(start_pos)
+        self.pos = Vector2(start_pos)
+        self.zoom = 1.0
+        self.impulse = Vector2(0, 0)
+        self.pulse_intensity = 0.0
+        
     def update(self, target, dt):
         """Smoothly tracks a target with framerate-independent lerp."""
         if dt <= 0:

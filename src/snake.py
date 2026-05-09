@@ -42,33 +42,58 @@ class Snake:
         
         self.particles = []
         
-        # Body Trail System (Plasma Ribbon)
+        # Plasma Ribbon
         self.body_length = 35
         self.segment_spacing = 3.0
         self.path_history = [Vector2(start_pos)]
         self.body_positions = [Vector2(start_pos) for _ in range(self.body_length)]
+        
+        # Finalization state
+        self.is_dead = False
+        self.disintegration_timer = 0.0
+        self.spawn_timer = 0.0
 
     def update(self, dt, keys):
         if dt <= 0:
             return
             
+        if self.is_dead:
+            self.disintegration_timer += dt
+            self.velocity *= (0.96 ** dt)
+            self.pos += self.velocity * dt
+            self._update_particles(dt)
+            self._update_body(dt)
+            return
+
+        self.spawn_timer += dt
+
         self.is_thrusting = False
         self.is_boosting = False
         
-        # 1. Handle Smooth Rotation
+        # 1. Difficulty Scaling (Inertia and Rotation)
+        # Higher length increases mass, making the snake feel 'heavier'
+        length_offset = max(0, self.body_length - 35)
+        mass_factor = 1.0 + (length_offset * 0.005) # Very subtle inertia scaling
+        rotational_dampening = 1.0 + (length_offset * 0.002)
+        
+        current_turn_speed = self.TURN_SPEED / rotational_dampening
+        
+        # 2. Handle Smooth Rotation
         if keys[pygame.K_a]:
-            self.angle -= self.TURN_SPEED * dt
+            self.angle -= current_turn_speed * dt
         if keys[pygame.K_d]:
-            self.angle += self.TURN_SPEED * dt
+            self.angle += current_turn_speed * dt
             
         self.angle %= 360.0
         
-        # Forward direction vector based on current angle
+        # Forward direction vector
         direction = Vector2(1, 0).rotate(self.angle)
+        lateral_dir = direction.rotate(90)
         
-        # 2. Handle Thrust & Acceleration
+        # 3. Handle Multi-Directional Thrust
         acceleration = Vector2(0, 0)
         
+        # Main Forward Thrust
         if keys[pygame.K_w]:
             self.is_thrusting = True
             if keys[pygame.K_SPACE]:
@@ -76,30 +101,71 @@ class Snake:
                 power = self.BOOST_POWER
             else:
                 power = self.THRUST_POWER
-                
-            acceleration = direction * power
+            acceleration += direction * power
             self._spawn_particles(direction, dt)
             
-        # 3. Physics Integration (Velocity and Damping)
+        # Reverse / Stabilization Thrust (S)
+        if keys[pygame.K_s]:
+            acceleration -= direction * (self.THRUST_POWER * 0.5)
+            
+        # Lateral Correction Thrusters (Q / E)
+        lateral_power = self.THRUST_POWER * 0.4
+        if keys[pygame.K_q]:
+            acceleration -= lateral_dir * lateral_power
+        if keys[pygame.K_e]:
+            acceleration += lateral_dir * lateral_power
+            
+        # Apply Mass to acceleration (Heavier snake = slower acceleration)
+        acceleration /= mass_factor
+            
+        # 4. Physics Integration
         self.velocity += acceleration * dt
-        
-        # Damping is applied exponentially to keep it framerate independent.
-        # This provides a "floaty" but controllable game feel.
         self.velocity *= (self.DAMPING ** dt)
         
-        # Clamp velocity to prevent infinite speed
         if self.velocity.length() > self.MAX_SPEED:
             self.velocity.scale_to_length(self.MAX_SPEED)
             
-        # 4. Update Position
         self.pos += self.velocity * dt
         
-        # 5. Update Visual Effects (Trail and Particles)
+        # 5. Self-Collision Detection
+        if self.check_self_collision():
+            self.is_dead = True
+        
+        # 6. Update Visual Effects
         self._update_trail(dt)
         self._update_particles(dt)
         self._update_body(dt)
 
+    def check_self_collision(self):
+        # 1. Grace Period: No collision for first few seconds of life
+        if self.spawn_timer < 3.0:
+            return False
+            
+        # 2. Minimum Length: Only collide once we have grown significantly
+        # (Start length is 35, so we need to collect at least 5-10 fragments)
+        if self.body_length < 45:
+            return False
+            
+        # 3. Skip 'Neck' segments: Ignore segments closest to the head
+        # We skip more segments as we grow to ensure the 'loop' is large enough to be fair
+        safe_segments = 25 
+        
+        # Head collision radius
+        head_radius = 12.0
+        
+        for i in range(safe_segments, min(self.body_length, len(self.body_positions))):
+            dist = self.pos.distance_to(self.body_positions[i])
+            if dist < head_radius:
+                # DEBUG PRINT for investigation
+                print(f"Collision! Seg:{i} Dist:{dist:.2f} Len:{self.body_length}")
+                return True
+        return False
+
     def _update_body(self, dt):
+        # 0. Defensive growth: Ensure body_positions matches body_length
+        while len(self.body_positions) < self.body_length:
+            self.body_positions.append(Vector2(self.pos))
+            
         # Record path if moved enough to avoid redundant dense points
         if self.path_history[-1].distance_to(self.pos) > 1.0:
             self.path_history.append(Vector2(self.pos))
@@ -131,8 +197,10 @@ class Snake:
                 
         # Prune history to prevent memory leaks (keep enough points for full body length)
         # 35 segments * 3 spacing = 105 length. Appending every 1 unit means ~105 points max needed.
-        if len(self.path_history) > 150:
-            self.path_history = self.path_history[-150:]
+        # Expand path history as length grows
+        history_limit = int(self.body_length * self.segment_spacing + 50)
+        if len(self.path_history) > history_limit:
+            self.path_history = self.path_history[-history_limit:]
 
     def _spawn_particles(self, direction, dt):
         # Spawn particles shooting opposite to movement direction with some spread
