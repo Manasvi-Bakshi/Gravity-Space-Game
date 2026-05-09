@@ -41,6 +41,12 @@ class Snake:
         self.max_trail_length = 25
         
         self.particles = []
+        
+        # Body Trail System (Plasma Ribbon)
+        self.body_length = 35
+        self.segment_spacing = 3.0
+        self.path_history = [Vector2(start_pos)]
+        self.body_positions = [Vector2(start_pos) for _ in range(self.body_length)]
 
     def update(self, dt, keys):
         if dt <= 0:
@@ -91,6 +97,42 @@ class Snake:
         # 5. Update Visual Effects (Trail and Particles)
         self._update_trail(dt)
         self._update_particles(dt)
+        self._update_body(dt)
+
+    def _update_body(self, dt):
+        # Record path if moved enough to avoid redundant dense points
+        if self.path_history[-1].distance_to(self.pos) > 1.0:
+            self.path_history.append(Vector2(self.pos))
+            
+        self.body_positions[0] = Vector2(self.pos)
+        
+        current_dist = 0.0
+        hist_idx = len(self.path_history) - 1
+        
+        # Walk backward along path history to place each segment exactly 'segment_spacing' apart
+        for i in range(1, self.body_length):
+            target_dist = i * self.segment_spacing
+            
+            while hist_idx > 0:
+                p1 = self.path_history[hist_idx]
+                p2 = self.path_history[hist_idx - 1]
+                dist_p1_p2 = p1.distance_to(p2)
+                
+                if current_dist + dist_p1_p2 >= target_dist:
+                    excess = target_dist - current_dist
+                    t = excess / dist_p1_p2 if dist_p1_p2 > 0 else 0
+                    self.body_positions[i] = p1.lerp(p2, t)
+                    break
+                else:
+                    current_dist += dist_p1_p2
+                    hist_idx -= 1
+            else:
+                self.body_positions[i] = Vector2(self.path_history[0])
+                
+        # Prune history to prevent memory leaks (keep enough points for full body length)
+        # 35 segments * 3 spacing = 105 length. Appending every 1 unit means ~105 points max needed.
+        if len(self.path_history) > 150:
+            self.path_history = self.path_history[-150:]
 
     def _spawn_particles(self, direction, dt):
         # Spawn particles shooting opposite to movement direction with some spread

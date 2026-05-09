@@ -71,7 +71,24 @@ class Renderer:
                 glow_color = (0, int(color_val * 0.3), int(color_val * 0.5), 255)
                 pygame.draw.line(self.glow_surface, glow_color, points[i], points[i+1], thickness + self._scale(camera, 4))
 
-        # 2. Draw thrust particles
+        # 2. Draw Snake Body (Plasma Ribbon)
+        for i in range(1, snake.body_length):
+            b_pos = snake.body_positions[i]
+            progress = i / snake.body_length 
+            inv_progress = 1.0 - progress    
+            
+            size = self._scale(camera, max(1.0, 11.0 * inv_progress))
+            alpha = int(255 * (inv_progress ** 1.5))
+            
+            core_color = (150, 220, 255, alpha)
+            glow_color = (0, 80, 255, int(alpha * 0.5))
+            
+            pos = self._transform(camera, b_pos)
+            
+            pygame.draw.circle(self.glow_surface, glow_color, pos, size * 2.5)
+            pygame.draw.circle(self.glow_surface, core_color, pos, size)
+
+        # 3. Draw thrust particles
         for p in snake.particles:
             ratio = p.lifetime / p.max_lifetime
             
@@ -88,7 +105,7 @@ class Renderer:
             pygame.draw.circle(screen, color, pos, size)
             pygame.draw.circle(self.glow_surface, glow, pos, size * 3)
 
-        # 3. Draw Snake Head (Glowing Triangle)
+        # 4. Draw Snake Head (Glowing Triangle)
         direction = Vector2(1, 0).rotate(snake.angle)
         right = Vector2(1, 0).rotate(snake.angle + 90)
         
@@ -107,5 +124,5 @@ class Renderer:
         pygame.draw.polygon(screen, (200, 240, 255), points)
         pygame.draw.polygon(screen, (255, 255, 255), points, width=self._scale(camera, 2))
         
-        # 4. Composite additive glow layer
+        # 5. Composite additive glow layer
         screen.blit(self.glow_surface, (0, 0), special_flags=pygame.BLEND_RGB_ADD)
