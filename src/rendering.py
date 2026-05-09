@@ -1,5 +1,6 @@
 import pygame
 from pygame.math import Vector2
+import math
 
 class Renderer:
     def __init__(self, width, height):
@@ -32,6 +33,65 @@ class Renderer:
             y = (star["pos"][1] - (camera.pos.y / depth)) % self.height
             
             pygame.draw.circle(screen, star["color"], (int(x), int(y)), star["size"])
+
+    def draw_collectibles(self, screen, camera, collectibles, particles):
+        # 1. Draw collectibles and their short trails
+        for c in collectibles:
+            # Short orbit trail arc
+            if len(c.trail) >= 2:
+                points = [self._transform(camera, p) for p in c.trail]
+                pygame.draw.lines(self.glow_surface, (0, 150, 200, 80), False, points, self._scale(camera, 2))
+                
+            # Collectible Shard (Alien/Ancient energy shape)
+            pulse = (math.sin(c.time_alive * 3.0) + 1.0) / 2.0 # 0.0 to 1.0
+            size = self._scale(camera, 6 + pulse * 2)
+            alpha = int(180 + pulse * 75)
+            
+            c_pos = self._transform(camera, c.pos)
+            
+            # Diamond shape for ancient/alien feel
+            top = (c_pos[0], c_pos[1] - size * 1.5)
+            bottom = (c_pos[0], c_pos[1] + size * 1.5)
+            left = (c_pos[0] - size, c_pos[1])
+            right = (c_pos[0] + size, c_pos[1])
+            
+            # Rotate points slightly for an organic floating feel
+            rot_angle = c.time_alive * 50.0
+            def rotate_pt(pt, center, angle):
+                s = math.sin(math.radians(angle))
+                c_a = math.cos(math.radians(angle))
+                pt = (pt[0] - center[0], pt[1] - center[1])
+                new_x = pt[0] * c_a - pt[1] * s
+                new_y = pt[0] * s + pt[1] * c_a
+                return (new_x + center[0], new_y + center[1])
+                
+            points = [rotate_pt(pt, c_pos, rot_angle) for pt in [top, right, bottom, left]]
+            
+            # Restrained glow
+            pygame.draw.polygon(self.glow_surface, (50, 200, 255, int(alpha * 0.4)), points)
+            pygame.draw.polygon(self.glow_surface, (150, 240, 255, alpha), points, width=self._scale(camera, 1))
+
+        # 2. Draw soft collection particle bursts
+        for p in particles:
+            ratio = p.lifetime / p.max_lifetime
+            size = self._scale(camera, max(1, 4 * ratio))
+            alpha = int(255 * ratio)
+            pos = self._transform(camera, p.pos)
+            
+            color = (150, 240, 255, alpha)
+            glow = (0, 150, 255, int(alpha * 0.5))
+            
+            pygame.draw.circle(self.glow_surface, glow, pos, size * 2)
+            pygame.draw.circle(self.glow_surface, color, pos, size)
+
+    def draw_screen_pulse(self, screen, camera):
+        if camera.pulse_intensity > 0:
+            alpha = int(camera.pulse_intensity * 255)
+            # Very faint teal screen pulse
+            pulse_surface = pygame.Surface((self.width, self.height))
+            pulse_surface.fill((0, 40, 60))
+            pulse_surface.set_alpha(alpha)
+            screen.blit(pulse_surface, (0, 0), special_flags=pygame.BLEND_RGB_ADD)
 
     def draw_planet(self, screen, camera, planet):
         pos = self._transform(camera, planet.pos)

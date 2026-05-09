@@ -5,6 +5,7 @@ from src.rendering import Renderer
 from src.planet import Planet
 from src.physics import apply_gravity
 from src.camera import Camera
+from src.collectible import Collectible, CollectibleParticle
 
 class Game:
     def __init__(self):
@@ -30,7 +31,11 @@ class Game:
         self.snake = Snake(start_pos)
         self.snake.velocity = pygame.math.Vector2(0, 300)
         
+        self.collectibles = [Collectible(self.planet) for _ in range(15)]
+        self.collection_particles = []
+        
         # Snap camera to snake initially so it doesn't pan wildly at startup
+        self.camera.base_pos = pygame.math.Vector2(start_pos)
         self.camera.pos = pygame.math.Vector2(start_pos)
         
         self.stars = []
@@ -74,11 +79,40 @@ class Game:
         self.snake.update(self.dt, keys)
         apply_gravity(self.planet, self.snake, self.dt)
         
+        for c in self.collectibles:
+            c.update(self.dt)
+            # Gentle radius-based collection
+            if self.snake.pos.distance_to(c.pos) < 30.0:
+                self._handle_collection(c)
+                
+        for p in self.collection_particles:
+            p.update(self.dt)
+        self.collection_particles = [p for p in self.collection_particles if p.lifetime > 0]
+        
         # Camera smoothing
         self.camera.update(self.snake, self.dt)
+
+    def _handle_collection(self, collectible):
+        # Visual feedback
+        self.camera.apply_collection_feedback(self.snake.velocity)
+        
+        # Spawn elegant, soft particle burst
+        for _ in range(8):
+            angle = random.uniform(0, 360)
+            speed = random.uniform(30, 80)
+            vel = pygame.math.Vector2(1, 0).rotate(angle) * speed
+            # Inherit slight momentum from snake
+            vel += self.snake.velocity * 0.15
+            lifetime = random.uniform(0.3, 0.6)
+            self.collection_particles.append(CollectibleParticle(collectible.pos, vel, lifetime))
+            
+        # Respawn in a new orbit
+        collectible.respawn()
 
     def draw(self):
         self.renderer.draw_background(self.screen, self.camera, self.stars)
         self.renderer.draw_planet(self.screen, self.camera, self.planet)
+        self.renderer.draw_collectibles(self.screen, self.camera, self.collectibles, self.collection_particles)
         self.renderer.draw_snake(self.screen, self.camera, self.snake)
+        self.renderer.draw_screen_pulse(self.screen, self.camera)
         pygame.display.flip()
