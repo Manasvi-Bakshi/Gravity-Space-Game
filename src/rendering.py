@@ -34,6 +34,35 @@ class Renderer:
             
             pygame.draw.circle(screen, star["color"], (int(x), int(y)), star["size"])
 
+    def draw_phenomena(self, screen, camera, debris, dust_currents):
+        # 1. Ambient Debris (Parallax Depth)
+        for p in debris.particles:
+            # Slower movement relative to camera based on depth
+            x = (p["pos"].x - (camera.pos.x / p["depth"])) % self.width
+            y = (p["pos"].y - (camera.pos.y / p["depth"])) % self.height
+            
+            # Very faint color
+            color = (150, 200, 255, p["alpha"])
+            size = self._scale(camera, p["size"])
+            # Draw directly to glow surface for soft blending
+            pygame.draw.circle(self.glow_surface, color, (int(x), int(y)), size)
+            
+        # 2. Gravitational Dust Currents
+        for p in dust_currents.particles:
+            pos = self._transform(camera, p["pos"])
+            
+            # Fade in and out based on lifetime
+            ratio = p["lifetime"] / p["max_lifetime"]
+            # Parabola for smooth fade in/out: 4 * x * (1 - x)
+            fade = 4.0 * ratio * (1.0 - ratio)
+            alpha = int(40 * fade) # Extremely faint, max 40/255
+            
+            color = (100, 150, 255, alpha)
+            size = self._scale(camera, 2.0)
+            
+            # Render to glow surface for soft additive blending
+            pygame.draw.circle(self.glow_surface, color, pos, size)
+
     def draw_collectibles(self, screen, camera, collectibles, particles):
         # 1. Draw collectibles and their short trails
         for c in collectibles:
@@ -93,26 +122,27 @@ class Renderer:
             pulse_surface.set_alpha(alpha)
             screen.blit(pulse_surface, (0, 0), special_flags=pygame.BLEND_RGB_ADD)
 
-    def draw_planet(self, screen, camera, planet):
-        pos = self._transform(camera, planet.pos)
-        base_radius = self._scale(camera, planet.radius)
-        
-        # 1. Atmospheric Glow (Additive Blending)
-        glow_radius = self._scale(camera, planet.radius * 2.5)
-        for i in range(5, 0, -1):
-            r = int(base_radius + (glow_radius - base_radius) * (i / 5.0))
-            alpha = int(40 * (1 - (i / 5.0)))
-            color = (50, 100, 200, alpha)
-            pygame.draw.circle(self.glow_surface, color, pos, r)
+    def draw_planets(self, screen, camera, planets):
+        for planet in planets:
+            pos = self._transform(camera, planet.pos)
+            base_radius = self._scale(camera, planet.radius)
             
-        # 2. Planet Core (Solid)
-        pygame.draw.circle(screen, (20, 30, 40), pos, base_radius)
-        pygame.draw.circle(screen, (60, 120, 180), pos, base_radius, width=self._scale(camera, 3))
-        
-        # 3. Subtle Debug Orbit ring (for visualizing gravity field scale)
-        orbit_radius = self._scale(camera, planet.radius * 4)
-        orbit_color = (40, 80, 100)
-        pygame.draw.circle(screen, orbit_color, pos, orbit_radius, width=self._scale(camera, 1))
+            # 1. Atmospheric Glow (Additive Blending)
+            glow_radius = self._scale(camera, planet.radius * 2.5)
+            for i in range(5, 0, -1):
+                r = int(base_radius + (glow_radius - base_radius) * (i / 5.0))
+                alpha = int(40 * (1 - (i / 5.0)))
+                color = (50, 100, 200, alpha)
+                pygame.draw.circle(self.glow_surface, color, pos, r)
+                
+            # 2. Planet Core (Solid)
+            pygame.draw.circle(screen, (20, 30, 40), pos, base_radius)
+            pygame.draw.circle(screen, (60, 120, 180), pos, base_radius, width=self._scale(camera, 3))
+            
+            # 3. Subtle Debug Orbit ring (for visualizing gravity field scale)
+            orbit_radius = self._scale(camera, planet.radius * 4)
+            orbit_color = (40, 80, 100)
+            pygame.draw.circle(screen, orbit_color, pos, orbit_radius, width=self._scale(camera, 1))
 
     def draw_snake(self, screen, camera, snake):
         self.glow_surface.fill((0, 0, 0, 0)) 

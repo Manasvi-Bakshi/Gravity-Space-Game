@@ -6,6 +6,7 @@ from src.planet import Planet
 from src.physics import apply_gravity
 from src.camera import Camera
 from src.collectible import Collectible, CollectibleParticle
+from src.phenomena import AmbientDebris, DustCurrent
 
 class Game:
     def __init__(self):
@@ -23,15 +24,20 @@ class Game:
         self.camera = Camera(self.width, self.height)
         
         # Environment
-        center_pos = (self.width / 2, self.height / 2)
-        self.planet = Planet(center_pos, radius=60, gravity_strength=2500000.0)
+        # Binary system with generous spacing. Slightly reduced gravity for each.
+        self.planets = [
+            Planet((self.width / 2 - 450, self.height / 2), radius=50, gravity_strength=1600000.0),
+            Planet((self.width / 2 + 450, self.height / 2), radius=60, gravity_strength=1900000.0)
+        ]
         
         # Entities
-        start_pos = (self.width / 2 - 300, self.height / 2)
+        # Start in the space between the planets
+        start_pos = (self.width / 2, self.height / 2 - 250)
         self.snake = Snake(start_pos)
-        self.snake.velocity = pygame.math.Vector2(0, 300)
+        self.snake.velocity = pygame.math.Vector2(450, 0)
         
-        self.collectibles = [Collectible(self.planet) for _ in range(15)]
+        # Distribute collectibles randomly across planets
+        self.collectibles = [Collectible(random.choice(self.planets)) for _ in range(20)]
         self.collection_particles = []
         
         # Snap camera to snake initially so it doesn't pan wildly at startup
@@ -40,6 +46,10 @@ class Game:
         
         self.stars = []
         self._init_stars()
+        
+        # Space Phenomena
+        self.ambient_debris = AmbientDebris(100, self.width, self.height)
+        self.dust_current = DustCurrent(max_particles=40)
 
     def _init_stars(self):
         """Generates a static starfield for the background."""
@@ -77,7 +87,7 @@ class Game:
         
         # Physics and Entities
         self.snake.update(self.dt, keys)
-        apply_gravity(self.planet, self.snake, self.dt)
+        apply_gravity(self.planets, self.snake, self.dt)
         
         for c in self.collectibles:
             c.update(self.dt)
@@ -91,6 +101,10 @@ class Game:
         
         # Camera smoothing
         self.camera.update(self.snake, self.dt)
+        
+        # Environmental Phenomena
+        self.ambient_debris.update(self.dt)
+        self.dust_current.update(self.dt, self.planets)
 
     def _handle_collection(self, collectible):
         # Visual feedback
@@ -106,12 +120,17 @@ class Game:
             lifetime = random.uniform(0.3, 0.6)
             self.collection_particles.append(CollectibleParticle(collectible.pos, vel, lifetime))
             
-        # Respawn in a new orbit
+        # Respawn in a new orbit (potentially transferring to the other planet)
+        collectible.planet = random.choice(self.planets)
         collectible.respawn()
 
     def draw(self):
         self.renderer.draw_background(self.screen, self.camera, self.stars)
-        self.renderer.draw_planet(self.screen, self.camera, self.planet)
+        
+        # Phenomena rendered below planets and gameplay objects
+        self.renderer.draw_phenomena(self.screen, self.camera, self.ambient_debris, self.dust_current)
+        
+        self.renderer.draw_planets(self.screen, self.camera, self.planets)
         self.renderer.draw_collectibles(self.screen, self.camera, self.collectibles, self.collection_particles)
         self.renderer.draw_snake(self.screen, self.camera, self.snake)
         self.renderer.draw_screen_pulse(self.screen, self.camera)
