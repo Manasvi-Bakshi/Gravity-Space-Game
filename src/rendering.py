@@ -237,37 +237,55 @@ class Renderer:
         screen.blit(self.glow_surface, (0, 0), special_flags=pygame.BLEND_RGB_ADD)
 
     def draw_hud(self, screen, snake, resonance, score):
-        # Minimalist Monospace HUD
-        y_offset = 30
-        line_height = 25
-        
-        # RESONANCE (Subtle bar)
-        res_label = self.font.render("RESONANCE", True, (100, 200, 255))
-        res_label.set_alpha(int(150 * resonance))
-        screen.blit(res_label, (40, y_offset))
-        
-        bar_width = 100
-        pygame.draw.rect(screen, (20, 40, 60), (40, y_offset + 20, bar_width, 4))
-        pygame.draw.rect(screen, (100, 220, 255), (40, y_offset + 20, int(bar_width * resonance), 4))
-        
-        # LENGTH & DEPTH
-        len_txt = self.font.render(f"LENGTH {snake.body_length}", True, (200, 240, 255))
-        len_txt.set_alpha(int(180 * resonance))
-        screen.blit(len_txt, (40, y_offset + 45))
-        
-        score_txt = self.font.render(f"DEPTH  {score}", True, (200, 240, 255))
-        score_txt.set_alpha(int(180 * resonance))
-        screen.blit(score_txt, (40, y_offset + 65))
-        
-        if snake.is_dead:
-            # Failure message
-            msg = self.large_font.render("RESONANCE COLLAPSED", True, (255, 100, 100))
-            restart = self.font.render("PRESS [SPACE] TO RE-ESTABLISH", True, (200, 200, 200))
+        # 1. Normal Gameplay HUD
+        if not snake.is_dead:
+            y_offset = 30
             
-            # Pulsing alpha
-            alpha = int(127 + 127 * math.sin(pygame.time.get_ticks() * 0.005))
-            msg.set_alpha(alpha)
-            restart.set_alpha(alpha)
+            # RESONANCE
+            res_label = self.font.render("RESONANCE", True, (100, 200, 255))
+            res_label.set_alpha(int(150 * resonance))
+            screen.blit(res_label, (40, y_offset))
             
-            screen.blit(msg, (self.width // 2 - msg.get_width() // 2, self.height // 2 - 40))
-            screen.blit(restart, (self.width // 2 - restart.get_width() // 2, self.height // 2 + 10))
+            bar_width = 100
+            pygame.draw.rect(screen, (20, 40, 60), (40, y_offset + 20, bar_width, 4))
+            pygame.draw.rect(screen, (100, 220, 255), (40, y_offset + 20, int(bar_width * resonance), 4))
+            
+            # LENGTH & DEPTH
+            len_txt = self.font.render(f"LENGTH {snake.body_length}", True, (200, 240, 255))
+            len_txt.set_alpha(int(180 * resonance))
+            screen.blit(len_txt, (40, y_offset + 45))
+            
+            score_txt = self.font.render(f"DEPTH  {score}", True, (200, 240, 255))
+            score_txt.set_alpha(int(180 * resonance))
+            screen.blit(score_txt, (40, y_offset + 65))
+        
+        # 2. Cinematic Failure Overlay
+        else:
+            # Darkening overlay
+            overlay = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+            overlay_alpha = int(min(180, snake.disintegration_timer * 100))
+            overlay.fill((0, 0, 0, overlay_alpha))
+            screen.blit(overlay, (0, 0))
+            
+            # Message and Stats
+            center_x = self.width // 2
+            center_y = self.height // 2
+            
+            msg = self.large_font.render(snake.death_type, True, (200, 240, 255))
+            msg.set_alpha(min(255, int(snake.disintegration_timer * 200)))
+            screen.blit(msg, (center_x - msg.get_width() // 2, center_y - 60))
+            
+            # Subtle Stat Line
+            stats_txt = f"DEPTH {score}  |  LENGTH {snake.body_length}"
+            stats_surface = self.font.render(stats_txt, True, (150, 180, 200))
+            stats_alpha = max(0, min(180, int(snake.disintegration_timer * 150 - 50)))
+            stats_surface.set_alpha(stats_alpha)
+            screen.blit(stats_surface, (center_x - stats_surface.get_width() // 2, center_y - 15))
+            
+            # Restart Prompt
+            restart_txt = "PRESS [SPACE] TO REALIGN"
+            restart_surface = self.font.render(restart_txt, True, (100, 200, 255))
+            pulse = int(127 + 127 * math.sin(pygame.time.get_ticks() * 0.003))
+            prompt_alpha = max(0, min(pulse, int(snake.disintegration_timer * 150 - 150)))
+            restart_surface.set_alpha(prompt_alpha)
+            screen.blit(restart_surface, (center_x - restart_surface.get_width() // 2, center_y + 40))

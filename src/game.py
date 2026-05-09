@@ -128,6 +128,16 @@ class Game:
         else:
             # Gentle recovery near planets
             self.resonance = min(1.0, self.resonance + self.dt * 0.2)
+            
+        if self.resonance <= 0:
+            self.snake.is_dead = True
+            self.snake.death_type = "SIGNAL LOST"
+            
+        # Planetary Impact Detection
+        for p in self.planets:
+            if self.snake.pos.distance_to(p.pos) < p.radius + 15:
+                self.snake.is_dead = True
+                self.snake.death_type = "ORBITAL COLLAPSE"
         
         for c in self.collectibles:
             c.update(self.dt)

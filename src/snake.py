@@ -50,6 +50,7 @@ class Snake:
         
         # Finalization state
         self.is_dead = False
+        self.death_type = "GRAVITATIONAL FAILURE" # Default
         self.disintegration_timer = 0.0
         self.spawn_timer = 0.0
 
@@ -158,6 +159,7 @@ class Snake:
             if dist < head_radius:
                 # DEBUG PRINT for investigation
                 print(f"Collision! Seg:{i} Dist:{dist:.2f} Len:{self.body_length}")
+                self.death_type = "GRAVITATIONAL FAILURE"
                 return True
         return False
 
@@ -186,7 +188,7 @@ class Snake:
                 
                 if current_dist + dist_p1_p2 >= target_dist:
                     excess = target_dist - current_dist
-                    t = excess / dist_p1_p2 if dist_p1_p2 > 0 else 0
+                    t = max(0.0, min(1.0, excess / dist_p1_p2)) if dist_p1_p2 > 0 else 0
                     self.body_positions[i] = p1.lerp(p2, t)
                     break
                 else:
