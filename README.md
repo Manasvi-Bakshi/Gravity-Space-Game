@@ -32,9 +32,5 @@ An atmospheric orbital survival game built with Pygame. Navigate a plasma-ribbon
 - **Plasma Ribbon**: Path-history interpolation for fluid, high-performance tail movement.
 - **Additive Rendering**: Custom glow pipeline for vibrant, atmospheric visuals.
 
-## Future Improvements
-- **Multiple Systems**: Procedurally generated binary or ternary star systems.
-- **Hostile Phenomena**: Black holes or solar flares that distort the ribbon.
-- **Advanced HUD**: Integrated diagnostic data displays for orbital velocity.
 
 *Created as a prototype for atmospheric orbital gameplay.*
