@@ -56,4 +56,4 @@ class Camera:
         if snake_velocity.length() > 0:
             direction = snake_velocity.normalize()
             self.impulse = direction * 10.0
-        self.pulse_intensity = 0.15 # Extremely faint additive screen pulse
+        self.pulse_intensity = 0.15 
